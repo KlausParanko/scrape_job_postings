@@ -49,6 +49,48 @@ def read():
         return pickle.load(fp)
 
 
+def look_at_duplicates():
+    """
+    What should I use as index?
+    - subset = ["job_title", "company_name", "location", "listing_date"]
+        - Looked at RECORDLY ['DATA ENGINEER', 'Recordly', 'Helsinki, Uusimaa, Finland', '2023-08-31'].The postings were identical by content but their applicants number was different, so maybe they're looking for two data engineers?
+    - only "link"
+        - no dupes
+        - use as idx?
+    """
+
+    def check_dupes_for_subset(postings, subset, show_dupes):
+        print("Index:", subset)
+        dupes_mask = postings.duplicated(subset, keep=False)
+        any_dupes = dupes_mask.any()
+        print("Any dupes for index?:", any_dupes)
+        if show_dupes:
+            display(
+                "Dupes:",
+                postings[dupes_mask].sort_values(["job_title", "company_name"]),
+            )
+        return postings[dupes_mask]
+
+    postings = read()
+    # ["job_title", "company_name", "location", "listing_date"] subset isn't unique
+    subset = ["job_title", "company_name", "location", "listing_date"]
+    subset_with_link = subset + ["link"]
+    show_dupes = False
+    dupes = check_dupes_for_subset(postings, subset, show_dupes)
+    check_dupes_for_subset(postings, subset_with_link, show_dupes)
+
+    # look at example duplicates link
+    # recordly_mask = (dupes.loc[:, subset] == ['DATA ENGINEER', 'Recordly', 'Helsinki, Uusimaa, Finland', '2023-08-31']).all(axis=1)
+    # dupes[recordly_mask].link.to_frame().style.format()
+
+    # "link" by itself doesn't have duplicates
+
+    print(
+        "Any duplicates for only 'link'?:",
+        postings.duplicated("link", keep=False).any(),
+    )
+
+
 if __name__ == "__main__":
     postings = _read_in_postings()
     for p in postings:
