@@ -3,11 +3,14 @@ from pathlib import Path
 from bs4 import BeautifulSoup
 import pickle
 
+import pandas as pd
+
 # input
 from get_postings import POSTINGS_FOLDER
 
 # outpt
-PARSED_POSTINGS_PATH = Path("parsed_postings.pkl")
+PARSED_POSTINGS_PATH = Path("parsed_postings.csv")
+BULLET_LISTS_PATH = Path("posting_bullet_lists.csv")
 
 
 # %%
@@ -44,12 +47,26 @@ def _parse_posting_html(posting_html):
     return parsed
 
 
-def read():
-    with open(PARSED_POSTINGS_PATH, "rb") as fp:
-        return pickle.load(fp)
+def _wrangle(postings):
+    def separate_and_wrangle_bullet_lists(postings):
+        """Bullet list is a list of lists. Multiple bullet lists, each bullet list separated into lines.
+        ->explode multiple bullet lists join lines with newline.
+        """
+        bullet_lists = postings[["link", "parsed_lists"]]
+        postings = postings.drop(columns="parsed_lists")
+
+        bullet_lists = bullet_lists.explode("parsed_lists")
+        bullet_lists["parsed_lists"] = bullet_lists["parsed_lists"].str.join("\n")
+
+        return postings, bullet_lists
+
+    postings = pd.DataFrame(postings)
+
+    postings, bullet_lists = separate_and_wrangle_bullet_lists(postings)
+    return postings, bullet_lists
 
 
-def look_at_duplicates():
+def _look_at_duplicates():
     """
     What should I use as index?
     - subset = ["job_title", "company_name", "location", "listing_date"]
@@ -60,10 +77,10 @@ def look_at_duplicates():
     """
 
     def check_dupes_for_subset(postings, subset, show_dupes):
-        print("Index:", subset)
+        print("Columns:", subset)
         dupes_mask = postings.duplicated(subset, keep=False)
         any_dupes = dupes_mask.any()
-        print("Any dupes for index?:", any_dupes)
+        print("Any dupes for subset?:", any_dupes)
         if show_dupes:
             display(
                 "Dupes:",
@@ -71,7 +88,7 @@ def look_at_duplicates():
             )
         return postings[dupes_mask]
 
-    postings = read()
+    postings = pd.read_csv(PARSED_POSTINGS_PATH)
     # ["job_title", "company_name", "location", "listing_date"] subset isn't unique
     subset = ["job_title", "company_name", "location", "listing_date"]
     subset_with_link = subset + ["link"]
@@ -91,11 +108,15 @@ def look_at_duplicates():
     )
 
 
+# %%
 if __name__ == "__main__":
+    # read in and parse
     postings = _read_in_postings()
     for p in postings:
         p.update(_parse_posting_html(p["posting_html"]))
         p.pop("posting_html")
 
-    with open(PARSED_POSTINGS_PATH, "wb") as fp:
-        pickle.dump(postings, fp)
+    postings, bullet_lists = _wrangle(postings)
+
+    postings.to_csv(PARSED_POSTINGS_PATH)
+    bullet_lists.to_csv(BULLET_LISTS_PATH)
