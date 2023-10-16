@@ -9,8 +9,8 @@ import pandas as pd
 from get_postings import POSTINGS_FOLDER
 
 # outpt
-PARSED_POSTINGS_PATH = Path("parsed_postings.csv")
-BULLET_LISTS_PATH = Path("posting_bullet_lists.csv")
+PARSED_POSTINGS_PATH = Path("parsed_postings.parquet")
+BULLET_LISTS_PATH = Path("posting_bullet_lists.parquet")
 
 
 # %%
@@ -61,7 +61,7 @@ def _wrangle(postings):
         return postings, bullet_lists
 
     postings = pd.DataFrame(postings)
-
+    postings = postings["listing_date"].apply(pd.to_datetime)
     postings, bullet_lists = separate_and_wrangle_bullet_lists(postings)
     return postings, bullet_lists
 
@@ -118,5 +118,5 @@ if __name__ == "__main__":
 
     postings, bullet_lists = _wrangle(postings)
 
-    postings.to_csv(PARSED_POSTINGS_PATH)
-    bullet_lists.to_csv(BULLET_LISTS_PATH)
+    postings.to_parquet(PARSED_POSTINGS_PATH, index=False)
+    bullet_lists.to_parquet(BULLET_LISTS_PATH, index=False)
