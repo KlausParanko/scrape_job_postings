@@ -61,7 +61,7 @@ def _wrangle(postings):
         return postings, bullet_lists
 
     postings = pd.DataFrame(postings)
-    postings = postings["listing_date"].apply(pd.to_datetime)
+    postings["listing_date"] = postings["listing_date"].apply(pd.to_datetime)
     postings, bullet_lists = separate_and_wrangle_bullet_lists(postings)
     return postings, bullet_lists
 
