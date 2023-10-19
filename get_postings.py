@@ -5,7 +5,7 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 import pickle
 
-from get_links_and_metadata import links_and_metadata
+from get_postings_list import links_and_metadata
 
 POSTINGS_FOLDER = Path("./postings")
 POSTINGS_FOLDER.mkdir(exist_ok=True)
