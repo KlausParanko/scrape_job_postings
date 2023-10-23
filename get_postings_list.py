@@ -138,20 +138,23 @@ def get_list_of_postings():
     return page_html
 
 
-def write(page_html, postings_list_folder):
-    already_gathered_postings_lists = list(postings_list_folder.glob("*"))
-
-    if len(already_gathered_postings_lists) == 0:
-        # no postings_list html:s exist yet, create first one
-        with open(postings_list_folder.joinpath("postings_list1.html"), "w") as fp:
-            fp.write(page_html)
-    else:
-        # get newest filenumber, increment it and use it in name for file
+def write(parsed_list_of_postings, postings_list_folder):
+    def get_new_file_number(already_gathered_postings_lists):
         file_numbers = [
             int(filepath.stem[-1]) for filepath in already_gathered_postings_lists
         ]
-        new_file_number = max(file_numbers) + 1
-        with open(
-            postings_list_folder.joinpath(f"postings_list{new_file_number}.html"), "w"
-        ) as fp:
-            fp.write(page_html)
+        return max(file_numbers) + 1
+
+    already_gathered_postings_lists = list(postings_list_folder.glob("*"))
+
+    if len(already_gathered_postings_lists) == 0:
+        # create first one
+        filepath = postings_list_folder.joinpath("postings_list1.pkl")
+        with open(filepath, "w") as fp:
+            pickle.dump(parsed_list_of_postings, fp)
+    else:
+        new_file_number = get_new_file_number(already_gathered_postings_lists)
+        filepath = postings_list_folder.joinpath(f"postings_list{new_file_number}.pkl")
+
+        with open(filepath, "w") as fp:
+            pickle.load(parsed_list_of_postings, fp)
