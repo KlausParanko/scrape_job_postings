@@ -2,6 +2,7 @@
 from pathlib import Path
 import random
 import time
+import pickle
 from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
@@ -20,41 +21,6 @@ class RandomSleep:
 
     def long():
         time.sleep(abs(random.normalvariate(7, 2)))
-
-
-def parse_html(load_path):
-    def parse_sidebar_item(list_item):
-        anchor = list_item.find("a")
-        link = anchor.attrs["href"]
-
-        metadata = list_item.find("div", attrs={"class": "base-search-card__info"})
-        job_title = metadata.find("h3").text.strip()
-        company_name = metadata.find("h4").text.strip()
-        location = metadata.find("span").text.strip()
-        listing_date = metadata.find("time").attrs["datetime"]
-
-        return {
-            "link": link,
-            "job_title": job_title,
-            "company_name": company_name,
-            "location": location,
-            "listing_date": listing_date,
-        }
-
-    load_path = Path(load_path)
-    if not load_path.exists():
-        raise Exception(
-            f"Html containing list of postings does not exist at path: {load_path}. If the file exists, fix the path. If it doesn't run get_html()."
-        )
-    with open(load_path, "r") as fp:
-        html = fp.read()
-
-    soup = BeautifulSoup(html, "lxml")
-    jobs_list = soup.find("ul", attrs={"class": "jobs-search__results-list"})
-
-    jobs_list_items = jobs_list.find_all("li")
-    parsed_list_items = [parse_sidebar_item(x) for x in jobs_list_items]
-    return parsed_list_items
 
 
 def get_list_of_postings():
@@ -138,7 +104,34 @@ def get_list_of_postings():
     return page_html
 
 
-def write(parsed_list_of_postings, postings_list_folder):
+def parse_html(html):
+    def parse_sidebar_item(list_item):
+        anchor = list_item.find("a")
+        link = anchor.attrs["href"]
+
+        metadata = list_item.find("div", attrs={"class": "base-search-card__info"})
+        job_title = metadata.find("h3").text.strip()
+        company_name = metadata.find("h4").text.strip()
+        location = metadata.find("span").text.strip()
+        listing_date = metadata.find("time").attrs["datetime"]
+
+        return {
+            "link": link,
+            "job_title": job_title,
+            "company_name": company_name,
+            "location": location,
+            "listing_date": listing_date,
+        }
+
+    soup = BeautifulSoup(html, "lxml")
+    jobs_list = soup.find("ul", attrs={"class": "jobs-search__results-list"})
+    jobs_list_items = jobs_list.find_all("li")
+    parsed_list_items = [parse_sidebar_item(x) for x in jobs_list_items]
+
+    return parsed_list_items
+
+
+def write(parsed_list_of_postings, postings_list_folder=POSTINGS_LIST_FOLDER):
     def get_new_file_number(already_gathered_postings_lists):
         file_numbers = [
             int(filepath.stem[-1]) for filepath in already_gathered_postings_lists
@@ -150,11 +143,26 @@ def write(parsed_list_of_postings, postings_list_folder):
     if len(already_gathered_postings_lists) == 0:
         # create first one
         filepath = postings_list_folder.joinpath("postings_list1.pkl")
-        with open(filepath, "w") as fp:
+        with open(filepath, "wb") as fp:
             pickle.dump(parsed_list_of_postings, fp)
     else:
         new_file_number = get_new_file_number(already_gathered_postings_lists)
         filepath = postings_list_folder.joinpath(f"postings_list{new_file_number}.pkl")
 
-        with open(filepath, "w") as fp:
-            pickle.load(parsed_list_of_postings, fp)
+        with open(filepath, "wb") as fp:
+            pickle.dump(parsed_list_of_postings, fp)
+
+
+def read(postings_list_folder=POSTINGS_LIST_FOLDER):
+    paths = list(postings_list_folder.glob("*"))
+    postings_lists = []
+    for p in paths:
+        with open(p, "rb") as fp:
+            postings_lists.append(pickle.load(fp))
+    return postings_lists
+
+
+html = get_list_of_postings()
+parsed_list_of_postings = parse_html(html)
+write(parsed_list_of_postings, POSTINGS_LIST_FOLDER)
+read(POSTINGS_LIST_FOLDER)
