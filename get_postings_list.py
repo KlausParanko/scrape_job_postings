@@ -1,16 +1,22 @@
 # %%
+import os
 from pathlib import Path
 import random
 import time
 import pickle
+
 from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 from selenium.common.exceptions import ElementNotInteractableException
+from selenium.webdriver import ChromeOptions
+
+from webdriver_manager.chrome import ChromeDriverManager
+from azure.storage.blob import BlobServiceClient, BlobClient, ContainerClient
+
 
 POSTINGS_LIST_FOLDER = Path("./postings_list")
 POSTINGS_LIST_FOLDER.mkdir(exist_ok=True)
-
 
 # %%
 
@@ -89,7 +95,9 @@ def get_list_of_postings():
 
     linkedin_url = r"https://fi.linkedin.com/jobs/data-analyst-jobs"
 
-    driver = webdriver.Chrome()
+    options = ChromeOptions()
+    options.set_capability("binary", "./chrome/chrome")
+    driver = webdriver.Chrome(ChromeDriverManager().install(), options=options)
     driver.get(linkedin_url)
     RandomSleep.long()
 
@@ -162,6 +170,37 @@ def read(postings_list_folder=POSTINGS_LIST_FOLDER):
     return postings_lists
 
 
+# %%
+def download_chrome_files():
+    blob_service_client = BlobServiceClient(
+        r"https://kparchrome.blob.core.windows.net/"
+    )
+
+    container_client = blob_service_client.get_container_client("chrome")
+    blob_list = container_client.list_blobs()
+    n_blobs = len(blob_list)
+    i = 0
+    for blob in blob_list:
+        print("Blob", i, "/", n_blobs)
+
+        blob_client = container_client.get_blob_client(blob)
+
+        filepath = blob.name  # .split("/")
+
+        # if double chrome/chrome/ replace one
+        filepath = filepath.replace("chrome/chrome/", "chrome/")
+        filepath = Path(filepath)
+
+        # create parent dirs, otherwise dir doesn't exist error
+        parents_path = Path("/".join(filepath.parts[:-1]))
+        parents_path.mkdir(parents=True, exist_ok=True)
+
+        with open(filepath, mode="wb") as sample_blob:
+            download_stream = blob_client.download_blob()
+            sample_blob.write(download_stream.readall())
+
+
+# %%
 html = get_list_of_postings()
 parsed_list_of_postings = parse_html(html)
 write(parsed_list_of_postings, POSTINGS_LIST_FOLDER)
