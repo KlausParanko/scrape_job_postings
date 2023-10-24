@@ -1,3 +1,5 @@
+%pip install beautifulsoup4 selenium webdriver_manager azure-storage-blob
+
 # %%
 import os
 from pathlib import Path
@@ -201,6 +203,11 @@ def download_chrome_files():
 
 
 # %%
+
+chrome_binary_exists = Path("chrome", "chrome").exists()
+if not chrome_binary_exists:
+    download_chrome_files()
+
 html = get_list_of_postings()
 parsed_list_of_postings = parse_html(html)
 write(parsed_list_of_postings, POSTINGS_LIST_FOLDER)
