@@ -161,12 +161,11 @@ def parse_html(html):
     return parsed_list_items
 
 
-def get_new_filepath(postings_list_folder=POSTINGS_LIST_PATHS["RAW_FOLDER"]):
-    def get_new_file_number(already_gathered_postings_lists):
-        file_numbers = [
-            int(filepath.stem[-1]) for filepath in already_gathered_postings_lists
-        ]
-        return max(file_numbers) + 1
+def get_new_file_number(folder):
+    digit_pattern = re.compile(r"\d+")
+    filepaths = [str(filepath) for filepath in list(folder.glob("*"))]
+    file_numbers = [re.search(digit_pattern, fp).group(0) for fp in filepaths]
+    return max(file_numbers) + 1
 
     already_gathered_postings_lists = list(postings_list_folder.glob("*"))
 
