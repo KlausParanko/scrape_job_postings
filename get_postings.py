@@ -12,8 +12,19 @@ POSTINGS_FOLDER.mkdir(exist_ok=True)
 
 
 # %%
+
+
+def read_in_postings():
+    filepaths = POSTINGS_FOLDER.glob("*")
+    postings = []
+    for path in filepaths:
+        with open(path, "rb") as fp:
+            d = pickle.load(fp)
+            postings.append(d)
+    return postings
+
+
 def _get_posting_html(driver, list_item: dict, id_for_filename: int, sleep: int):
-    # TODO: try logging in? needed at least in looking at posting contents
     link = list_item["link"]
 
     driver.implicitly_wait(5)

@@ -6,7 +6,7 @@ import pickle
 import pandas as pd
 
 # input
-from get_postings import POSTINGS_FOLDER
+from get_postings import POSTINGS_FOLDER, read_in_postings
 
 # outpt
 PARSED_POSTINGS_PATH = Path("parsed_postings.parquet")
@@ -14,14 +14,6 @@ BULLET_LISTS_PATH = Path("posting_bullet_lists.parquet")
 
 
 # %%
-def _read_in_postings():
-    filepaths = POSTINGS_FOLDER.glob("*")
-    postings = []
-    for path in filepaths:
-        with open(path, "rb") as fp:
-            d = pickle.load(fp)
-            postings.append(d)
-    return postings
 
 
 def _parse_posting_html(posting_html):
