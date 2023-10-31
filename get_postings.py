@@ -52,7 +52,8 @@ def _get_posting_html(driver, list_item: dict, id_for_filename: int, sleep: int)
 
 def get_all_posting_content(links_and_metadata):
     driver = webdriver.Chrome()
-    for id, lam in enumerate(links_and_metadata):
+    start_id = get_new_file_number(POSTINGS_FOLDER)
+    for id, lam in enumerate(links_and_metadata, start=start_id):
         try:
             _get_posting_html(driver, lam, id, sleep=30)
         except:
