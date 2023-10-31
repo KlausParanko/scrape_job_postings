@@ -1,15 +1,22 @@
 # %%
 from pathlib import Path
 import time
+import pandas as pd
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 import pickle
 
-from get_postings_list import links_and_metadata
+from get_postings_list import (
+    POSTINGS_LIST_PATHS,
+    IDENTIFYING_COLUMNS,
+    download_blob_to_file,
+    get_new_file_number,
+)
+
+from azure_credentials import blob_client
 
 POSTINGS_FOLDER = Path("./postings")
 POSTINGS_FOLDER.mkdir(exist_ok=True)
-
 
 # %%
 
@@ -62,5 +69,28 @@ def get_all_posting_content(links_and_metadata):
             _get_posting_html(driver, lam, id, sleep=30)
 
 
-# TODO: check if works
-# get_all_posting_content(links_and_metadata)
+# need to create version with knowledge of which ones I have already gotten and which ones not
+# currently saves to dict, probably works okay
+# analysis reads in parquet
+
+
+# remove already parsed from postings_list
+def separate_not_yet_gotten_postings_from_list(
+    postings_list, postings, identifying_columns=IDENTIFYING_COLUMNS
+):
+    """No need to get them again."""
+    merged = pd.merge(
+        postings_list,
+        postings[identifying_columns],
+        how="left",
+        indicator="exists",
+    )
+    new_postings = merged[merged["exists"] == "left_only"]
+    new_postings = new_postings.drop("exists", axis=1)
+
+    return new_postings
+
+
+postings_list = pd.read_csv(POSTINGS_LIST_PATHS["MERGED"], index_col=0)
+postings = pd.DataFrame(read_in_postings())
+new_postings = separate_not_yet_gotten_postings_from_list(postings_list, postings)
