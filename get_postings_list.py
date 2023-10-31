@@ -1,4 +1,5 @@
 # %%
+from dataclasses import dataclass
 from pathlib import Path
 import random
 import time
@@ -13,28 +14,26 @@ from selenium.webdriver import ChromeOptions
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 
-from azure.storage.blob import BlobServiceClient, BlobClient, ContainerClient
 
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 
-from azure_credentials import storage_account_name, container_name, key
+from azure_credentials import blob_client
+
+
+POSTINGS_LIST_PATHS = {
+    # contains results of each time this script is run
+    "RAW_FOLDER": Path("./postings_list/raw"),
+    # contains deduplicated and merged results
+    "MERGED": Path("./postings_list/merged.csv"),
+    # MERGED but on azure blob storage
+    "AZURE_FILENAME": "postings_list.csv",
+}
+
+POSTINGS_LIST_PATHS["RAW_FOLDER"].mkdir(exist_ok=True)
 
 
 # %%
-POSTINGS_LIST_FOLDER_PKL = Path("./postings_list/pkl")
-POSTINGS_LIST_FOLDER_PKL.mkdir(exist_ok=True)
-
-POSTINGS_LIST_FOLDER_CSV = Path("./postings_list/csv")
-POSTINGS_LIST_FOLDER_CSV.mkdir(exist_ok=True)
-
-BIN_CHROME = r"./chrome/chrome"
-
-for path in [POSTINGS_LIST_FOLDER_PKL, BIN_CHROME]:
-    if not Path(path).exists():
-        raise Exception(f"{path=} doesn't exist.")
-
-
 class RandomSleep:
     @staticmethod
     def short():
@@ -162,17 +161,15 @@ def parse_html(html):
     return parsed_list_items
 
 
-def write(parsed_list_of_postings, postings_list_folder=POSTINGS_LIST_FOLDER_PKL):
+def get_new_filepath(postings_list_folder=POSTINGS_LIST_PATHS["RAW_FOLDER"]):
     def get_new_file_number(already_gathered_postings_lists):
         file_numbers = [
             int(filepath.stem[-1]) for filepath in already_gathered_postings_lists
         ]
         return max(file_numbers) + 1
 
-    print("Writing results to file.")
     already_gathered_postings_lists = list(postings_list_folder.glob("*"))
 
-    # get write filepath
     if len(already_gathered_postings_lists) == 0:
         # create first one
         filepath = postings_list_folder.joinpath("postings_list1.csv")
@@ -181,10 +178,19 @@ def write(parsed_list_of_postings, postings_list_folder=POSTINGS_LIST_FOLDER_PKL
         new_file_number = get_new_file_number(already_gathered_postings_lists)
         filepath = postings_list_folder.joinpath(f"postings_list{new_file_number}.csv")
 
-    parsed_list_of_postings.to_csv(filepath)
+    return filepath
 
 
-def read(postings_list_folder=POSTINGS_LIST_FOLDER_CSV):
+def deduplicate(new_merged_df):
+    identifying_columns = new_merged_df.columns.drop("link")
+    dupes = new_merged_df.duplicated(subset=identifying_columns)
+    deduped = new_merged_df[~dupes]
+    dropped_dupes = new_merged_df[dupes].sort_values(new_merged_df.columns.tolist())
+
+    return deduped
+
+
+def read(postings_list_folder=POSTINGS_LIST_PATHS["RAW_FOLDER"]):
     paths = list(postings_list_folder.glob("*"))
     postings_lists = []
     for p in paths:
@@ -193,78 +199,58 @@ def read(postings_list_folder=POSTINGS_LIST_FOLDER_CSV):
     return pd.concat(postings_lists)
 
 
-# %%
-def download_chrome_files():
-    blob_service_client = BlobServiceClient(
-        r"https://kparchrome.blob.core.windows.net/"
+def add_new_postings_into_previous_ones(
+    df_list_of_postings, path=POSTINGS_LIST_PATHS["MERGED"]
+) -> None:
+    if path.exists():
+        # merge new postings with previously merged postings
+        old_merged_df = pd.read_csv(path, index_col=0)
+        df_list_of_postings = pd.concat([old_merged_df, df_list_of_postings])
+
+    # deduplicate
+    deduped = deduplicate(df_list_of_postings)
+
+    # overwrite old one with new one
+    deduped.to_csv(path)
+
+
+def upload_file_to_blob(
+    blob_service_client,
+    azure_filename=POSTINGS_LIST_PATHS["AZURE_FILENAME"],
+    local_filepath=POSTINGS_LIST_PATHS["MERGED"],
+):
+    container_client = blob_service_client.get_container_client(container=".")
+    with open(local_filepath, mode="rb") as data:
+        container_client.upload_blob(name=azure_filename, data=data, overwrite=True)
+
+
+def download_blob_to_file(
+    blob_service_client,
+    local_path,
+    azure_filename=POSTINGS_LIST_PATHS["AZURE_FILENAME"],
+):
+    blob_client = blob_service_client.get_blob_client(
+        container=".", blob=azure_filename
     )
 
-    container_client = blob_service_client.get_container_client("chrome")
-    blob_list = list(container_client.list_blobs())
-    n_blobs = len(blob_list)
-    i = 0
-    for blob in blob_list:
-        print("Blob", i, "/", n_blobs)
-
-        blob_client = container_client.get_blob_client(blob)
-
-        filepath = blob.name  # .split("/")
-
-        # if double chrome/chrome/ replace one
-        filepath = filepath.replace("chrome/chrome/", "chrome/")
-
-        # create parent dirs, otherwise dir doesn't exist error
-        parents_path = Path("/".join(filepath.parts[:-1]))
-        parents_path.mkdir(parents=True, exist_ok=True)
-
-        print(filepath)
-        with open(filepath, mode="wb") as sample_blob:
-            download_stream = blob_client.download_blob()
-            sample_blob.write(download_stream.readall())
-
-        i += 1
+    with open(local_path, mode="wb") as blob:
+        download_stream = blob_client.download_blob()
+        blob.write(download_stream.readall())
 
 
 # %%
 def get_and_write():
+    # get postings and turn to df
     html = get_list_of_postings()
     parsed_list_of_postings = parse_html(html)
     df_list_of_postings = pd.DataFrame(parsed_list_of_postings)
-    write(df_list_of_postings, POSTINGS_LIST_FOLDER_CSV)
-    # print(df_list_of_postings)
 
+    # save this run's postings locally
+    new_filepath = get_new_filepath()
+    df_list_of_postings.to_csv(new_filepath)
 
-# get_and_write()
+    # merge this run's postings with previous runs and save to file
+    add_new_postings_into_previous_ones(df_list_of_postings)
 
-df_list_of_postings = read()
-
-
-# %%  WRITE TO AZURE WITH SPARK
-
-# Init session and download azure dependencies
-spark = SparkSession.builder.config(
-    "spark.jars.packages",
-    "org.apache.hadoop:hadoop-azure:3.3.1,com.microsoft.azure:azure-storage:8.6.6",
-).getOrCreate()
-
-# authorize azure
-spark.conf.set(
-    f"fs.azure.account.key.{storage_account_name}.blob.core.windows.net",
-    key,
-)
-
-# turn into spark df
-df = spark.createDataFrame(df_list_of_postings)
-df = df.withColumn("listing_date", df["listing_date"].cast("date"))
-
-# write to azure
-df.write.parquet(
-    rf"wasbs://{container_name}@{storage_account_name}.blob.core.windows.net/test1.parquet/"
-)
-
-df_lol = spark.read.parquet(
-    rf"wasbs://{container_name}@{storage_account_name}.blob.core.windows.net/test1.parquet/"
-)
-
-
-df_lol.show()
+    # upload merged results to azure
+    upload_file_to_blob(blob_client)
