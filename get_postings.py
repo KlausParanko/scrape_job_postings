@@ -31,6 +31,22 @@ def read_in_postings():
     return postings
 
 
+def _remove_already_gotten_postings_from_list(
+    postings_list, postings, identifying_columns=IDENTIFYING_COLUMNS
+):
+    """No need to get them again."""
+    merged = pd.merge(
+        postings_list,
+        postings[identifying_columns],
+        how="left",
+        indicator="exists",
+    )
+    new_postings = merged[merged["exists"] == "left_only"]
+    new_postings = new_postings.drop("exists", axis=1)
+
+    return new_postings
+
+
 def _get_posting_html(driver, list_item: dict, id_for_filename: int, sleep: int):
     link = list_item["link"]
 
@@ -68,37 +84,37 @@ def prepare_postings_list():
     return links_and_metadata
 
 
+def get_all_posting_content(links_and_metadata, n_retries=10):
+    def print_run_stats(current_iteration, total_iterations, start_time):
+        print(f"{current_iteration=} / {total_iterations=}")
+        print(f"Index of postings file: {idx}")
+        elapsed_time_in_min = (time.time() - start_time) / 60
+        print(f"Elapsed time in min: {elapsed_time_in_min:.0f}")
+        average_time_per_iteration = elapsed_time_in_min / (current_iteration + 1)
+        print(f"Avg time per iteration: {average_time_per_iteration:.0f}")
+        expected_time_left = (
+            total_iterations - current_iteration * average_time_per_iteration
+        )
+        print(f"{expected_time_left=}\n")
+
     driver = webdriver.Chrome()
-    start_id = get_new_file_number(POSTINGS_FOLDER)
-    for id, lam in enumerate(links_and_metadata, start=start_id):
+    start_idx = get_new_file_number(POSTINGS_FOLDER)
+
+    current_iteration = 0
+    total_iterations = len(links_and_metadata)
+    start_time = time.time()
+    for idx, lam in enumerate(links_and_metadata, start=start_idx):
+        print_run_stats(current_iteration, total_iterations, start_time)
+
         try:
-            _get_posting_html(driver, lam, id, sleep=30)
+            _get_posting_html(driver, lam, idx, sleep=30)
         except:
-            print("Hit exception at id:", id)
-            time.sleep(5 * 60)
-            _get_posting_html(driver, lam, id, sleep=30)
+            for _ in range(n_retries):
+                print("Hit exception at", lam)
+                time.sleep(5 * 60)
+                _get_posting_html(driver, lam, idx, sleep=30)
 
-
-# need to create version with knowledge of which ones I have already gotten and which ones not
-# currently saves to dict, probably works okay
-# analysis reads in parquet
-
-
-# remove already parsed from postings_list
-def separate_not_yet_gotten_postings_from_list(
-    postings_list, postings, identifying_columns=IDENTIFYING_COLUMNS
-):
-    """No need to get them again."""
-    merged = pd.merge(
-        postings_list,
-        postings[identifying_columns],
-        how="left",
-        indicator="exists",
-    )
-    new_postings = merged[merged["exists"] == "left_only"]
-    new_postings = new_postings.drop("exists", axis=1)
-
-    return new_postings
+        current_iteration += 1
 
 
 # %%
