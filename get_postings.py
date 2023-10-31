@@ -57,7 +57,17 @@ def _get_posting_html(driver, list_item: dict, id_for_filename: int, sleep: int)
         pickle.dump(list_item, fp)
 
 
-def get_all_posting_content(links_and_metadata):
+def prepare_postings_list():
+    """Remove already gotten postings and turn rows into list of dicts."""
+    postings_list = pd.read_csv(POSTINGS_LIST_PATHS["MERGED"], index_col=0)
+    already_gotten_postings = pd.DataFrame(read_in_postings())
+    links_and_metadata = _remove_already_gotten_postings_from_list(
+        postings_list, already_gotten_postings
+    )
+    links_and_metadata = links_and_metadata.to_dict(orient="records")
+    return links_and_metadata
+
+
     driver = webdriver.Chrome()
     start_id = get_new_file_number(POSTINGS_FOLDER)
     for id, lam in enumerate(links_and_metadata, start=start_id):
@@ -91,6 +101,6 @@ def separate_not_yet_gotten_postings_from_list(
     return new_postings
 
 
-postings_list = pd.read_csv(POSTINGS_LIST_PATHS["MERGED"], index_col=0)
-postings = pd.DataFrame(read_in_postings())
-new_postings = separate_not_yet_gotten_postings_from_list(postings_list, postings)
+# %%
+links_and_metadata = prepare_postings_list()
+get_all_posting_content(links_and_metadata)
