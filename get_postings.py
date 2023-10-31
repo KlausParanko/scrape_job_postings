@@ -84,7 +84,7 @@ def prepare_postings_list():
     return links_and_metadata
 
 
-def get_all_posting_content(links_and_metadata, n_retries=10):
+def get_all_posting_htmls(links_and_metadata, n_retries=10):
     def print_run_stats(current_iteration, total_iterations, start_time):
         print(f"{current_iteration=} / {total_iterations=}")
         print(f"Index of postings file: {idx}")
@@ -119,4 +119,4 @@ def get_all_posting_content(links_and_metadata, n_retries=10):
 
 # %%
 links_and_metadata = prepare_postings_list()
-get_all_posting_content(links_and_metadata)
+get_all_posting_htmls(links_and_metadata)
