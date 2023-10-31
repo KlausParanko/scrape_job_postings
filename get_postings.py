@@ -10,19 +10,24 @@ from get_postings_list import (
     POSTINGS_LIST_PATHS,
     IDENTIFYING_COLUMNS,
     download_blob_to_file,
+    upload_file_to_blob,
     get_new_file_number,
 )
 
 from azure_credentials import blob_client
 
-POSTINGS_FOLDER = Path("./postings")
-POSTINGS_FOLDER.mkdir(exist_ok=True)
+POSTINGS_PATHS = {
+    "RAW_FOLDER": Path("./postings/raw"),
+    "MERGED": Path("./postings/merged.parquet"),
+    "AZURE_FILENAME": "postings.parquet",
+}
+POSTINGS_PATHS["RAW_FOLDER"].mkdir(exist_ok=True)
 
 # %%
 
 
 def read_in_postings():
-    filepaths = POSTINGS_FOLDER.glob("*")
+    filepaths = POSTINGS_PATHS["RAW_FOLDER"].glob("*")
     postings = []
     for path in filepaths:
         with open(path, "rb") as fp:
@@ -68,7 +73,7 @@ def _get_posting_html(driver, list_item: dict, id_for_filename: int, sleep: int)
     list_item["posting_html"] = page_html
 
     filename = "posting" + str(id_for_filename) + ".pkl"
-    path = POSTINGS_FOLDER.joinpath(filename)
+    path = POSTINGS_PATHS["RAW_FOLDER"].joinpath(filename)
     with open(path, "wb") as fp:
         pickle.dump(list_item, fp)
 
@@ -98,7 +103,7 @@ def get_all_posting_htmls(links_and_metadata, n_retries=10):
         print(f"{expected_time_left=}\n")
 
     driver = webdriver.Chrome()
-    start_idx = get_new_file_number(POSTINGS_FOLDER)
+    start_idx = get_new_file_number(POSTINGS_PATHS["RAW_FOLDER"])
 
     current_iteration = 0
     total_iterations = len(links_and_metadata)
@@ -117,6 +122,17 @@ def get_all_posting_htmls(links_and_metadata, n_retries=10):
         current_iteration += 1
 
 
+def merge_save_and_upload_postings():
+    merged = pd.DataFrame(read_in_postings())
+    merged.to_parquet(POSTINGS_PATHS["MERGED"])
+    upload_file_to_blob(
+        blob_client,
+        azure_filename=POSTINGS_PATHS["AZURE_FILENAME"],
+        local_filepath=POSTINGS_PATHS["MERGED"],
+    )
+
+
 # %%
 links_and_metadata = prepare_postings_list()
 get_all_posting_htmls(links_and_metadata)
+merge_save_and_upload_postings()
