@@ -15,7 +15,6 @@ from get_postings_list import (
 from azure_credentials import blob_client
 from data_paths import POSTINGS_LIST_PATHS, POSTINGS_CONTENT_PATHS
 
-POSTINGS_CONTENT_PATHS["RAW_FOLDER"].mkdir(exist_ok=True)
 
 # %%
 
