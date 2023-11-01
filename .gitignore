@@ -5,3 +5,4 @@ __pycache__/
 
 azure_credentials.py
 data/
+venv/
