@@ -21,18 +21,8 @@ from pyspark.sql import functions as F
 
 from azure_credentials import blob_client
 from azure_io import upload_file_to_blob
+from data_paths import POSTINGS_LIST_PATHS
 
-
-POSTINGS_LIST_PATHS = {
-    # contains results of each time this script is run
-    "RAW_FOLDER": Path("./postings_list/raw"),
-    # contains deduplicated and merged results
-    "MERGED": Path("./postings_list/merged.csv"),
-    # MERGED but on azure blob storage
-    "AZURE_FILENAME": "postings_list.csv",
-}
-
-POSTINGS_LIST_PATHS["RAW_FOLDER"].mkdir(exist_ok=True)
 
 # used for deduplication
 IDENTIFYING_COLUMNS = [
