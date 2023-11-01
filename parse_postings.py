@@ -6,12 +6,10 @@ import pickle
 import pandas as pd
 
 # input
-from get_postings import POSTINGS_FOLDER, read_in_postings
-
-# outpt
-PARSED_POSTINGS_PATH = Path("parsed_postings.parquet")
-BULLET_LISTS_PATH = Path("posting_bullet_lists.parquet")
-
+from get_postings import read_in_postings
+from azure_io import upload_file_to_blob
+from azure_credentials import blob_client
+from data_paths import PARSED_POSTINGS_PATH
 
 # %%
 
@@ -80,7 +78,7 @@ def _look_at_duplicates():
             )
         return postings[dupes_mask]
 
-    postings = pd.read_csv(PARSED_POSTINGS_PATH)
+    postings = pd.read_csv(PARSED_POSTINGS_PATH["WHOLE_POSTING"])
     # ["job_title", "company_name", "location", "listing_date"] subset isn't unique
     subset = ["job_title", "company_name", "location", "listing_date"]
     subset_with_link = subset + ["link"]
@@ -103,12 +101,16 @@ def _look_at_duplicates():
 # %%
 if __name__ == "__main__":
     # read in and parse
-    postings = _read_in_postings()
+    postings = read_in_postings()
     for p in postings:
         p.update(_parse_posting_html(p["posting_html"]))
         p.pop("posting_html")
 
     postings, bullet_lists = _wrangle(postings)
 
-    postings.to_parquet(PARSED_POSTINGS_PATH, index=False)
-    bullet_lists.to_parquet(BULLET_LISTS_PATH, index=False)
+    postings.to_parquet(PARSED_POSTINGS_PATH["WHOLE_POSTING"], index=False)
+    bullet_lists.to_parquet(PARSED_POSTINGS_PATH["BULLET_LISTS"], index=False)
+
+    upload_file_to_blob(
+        blob_client,
+    )
