@@ -216,7 +216,7 @@ def add_new_postings_into_previous_ones(
 
 
 # %%
-def get_and_write():
+def main():
     # get postings and turn to df
     html = get_list_of_postings()
     parsed_list_of_postings = parse_html(html)

@@ -127,6 +127,8 @@ def merge_save_and_upload_postings():
 
 # %%
 
-# links_and_metadata = prepare_postings_list()
-# get_all_posting_htmls(links_and_metadata)
-# merge_save_and_upload_postings()
+
+def main():
+    links_and_metadata = prepare_postings_list()
+    get_all_posting_htmls(links_and_metadata)
+    merge_save_and_upload_postings()

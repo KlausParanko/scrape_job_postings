@@ -1,5 +1,5 @@
 chrome/
-chrome_driver
+chromedriver
 
 __pycache__/
 

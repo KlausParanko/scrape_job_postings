@@ -99,8 +99,7 @@ def _look_at_duplicates():
 
 
 # %%
-if __name__ == "__main__":
-    # read in and parse
+def main():
     postings = read_in_postings()
     for p in postings:
         p.update(_parse_posting_html(p["posting_html"]))
