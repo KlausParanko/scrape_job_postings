@@ -2,6 +2,7 @@
 from dataclasses import dataclass
 from pathlib import Path
 import random
+import re
 import time
 import pickle
 
@@ -19,6 +20,7 @@ from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 
 from azure_credentials import blob_client
+from azure_io import upload_file_to_blob
 
 
 POSTINGS_LIST_PATHS = {
@@ -31,6 +33,14 @@ POSTINGS_LIST_PATHS = {
 }
 
 POSTINGS_LIST_PATHS["RAW_FOLDER"].mkdir(exist_ok=True)
+
+# used for deduplication
+IDENTIFYING_COLUMNS = [
+    "job_title",
+    "company_name",
+    "location",
+    "listing_date",
+]
 
 
 # %%
@@ -164,9 +174,11 @@ def parse_html(html):
 def get_new_file_number(folder):
     digit_pattern = re.compile(r"\d+")
     filepaths = [str(filepath) for filepath in list(folder.glob("*"))]
-    file_numbers = [re.search(digit_pattern, fp).group(0) for fp in filepaths]
+    file_numbers = [int(re.search(digit_pattern, fp).group(0)) for fp in filepaths]
     return max(file_numbers) + 1
 
+
+def get_new_filepath(postings_list_folder=POSTINGS_LIST_PATHS["RAW_FOLDER"]):
     already_gathered_postings_lists = list(postings_list_folder.glob("*"))
 
     if len(already_gathered_postings_lists) == 0:
@@ -174,13 +186,13 @@ def get_new_file_number(folder):
         filepath = postings_list_folder.joinpath("postings_list1.csv")
 
     else:
-        new_file_number = get_new_file_number(already_gathered_postings_lists)
+        new_file_number = get_new_file_number(postings_list_folder)
         filepath = postings_list_folder.joinpath(f"postings_list{new_file_number}.csv")
 
     return filepath
 
 
-def deduplicate(new_merged_df):
+def deduplicate(new_merged_df, identifying_columns=IDENTIFYING_COLUMNS):
     identifying_columns = new_merged_df.columns.drop("link")
     dupes = new_merged_df.duplicated(subset=identifying_columns)
     deduped = new_merged_df[~dupes]
@@ -211,30 +223,6 @@ def add_new_postings_into_previous_ones(
 
     # overwrite old one with new one
     deduped.to_csv(path)
-
-
-def upload_file_to_blob(
-    blob_service_client,
-    azure_filename=POSTINGS_LIST_PATHS["AZURE_FILENAME"],
-    local_filepath=POSTINGS_LIST_PATHS["MERGED"],
-):
-    container_client = blob_service_client.get_container_client(container=".")
-    with open(local_filepath, mode="rb") as data:
-        container_client.upload_blob(name=azure_filename, data=data, overwrite=True)
-
-
-def download_blob_to_file(
-    blob_service_client,
-    local_path,
-    azure_filename=POSTINGS_LIST_PATHS["AZURE_FILENAME"],
-):
-    blob_client = blob_service_client.get_blob_client(
-        container=".", blob=azure_filename
-    )
-
-    with open(local_path, mode="wb") as blob:
-        download_stream = blob_client.download_blob()
-        blob.write(download_stream.readall())
 
 
 # %%
