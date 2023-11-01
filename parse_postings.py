@@ -113,4 +113,6 @@ if __name__ == "__main__":
 
     upload_file_to_blob(
         blob_client,
+        azure_filename=PARSED_POSTINGS_PATH["AZURE_FILENAME"],
+        local_filepath=PARSED_POSTINGS_PATH["WHOLE_POSTING"],
     )
