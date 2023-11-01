@@ -18,6 +18,7 @@ POSTINGS_CONTENT_PATHS = {
     "MERGED": DATA_FOLDER.joinpath("postings", "merged.parquet"),
     "AZURE_FILENAME": "postings.parquet",
 }
+POSTINGS_CONTENT_PATHS["RAW_FOLDER"].mkdir(exist_ok=True)
 
 PARSED_POSTINGS_PATH = {
     "WHOLE_POSTING": DATA_FOLDER.joinpath("parsed_postings", "parsed_postings.parquet"),
