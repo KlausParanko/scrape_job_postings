@@ -11,7 +11,7 @@ from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 from selenium.common.exceptions import ElementNotInteractableException
-from selenium.webdriver import ChromeOptions
+from selenium.webdriver import ChromeOptions, ChromeService
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 
@@ -112,10 +112,14 @@ def get_list_of_postings(timeout_in_mins=10):
     linkedin_url = r"https://fi.linkedin.com/jobs/data-analyst-jobs"
 
     print("Initializing driver.")
-    # options = ChromeOptions()
-    # options.set_capability("binary", BIN_CHROME)
-    # options.add_argument("--headless")
-    driver = webdriver.Chrome()
+    # TODO init shared by get_postings.py, extract to module
+    options = ChromeOptions()
+    service = ChromeService()
+
+    options.binary_location = "./chrome/chrome"
+    service.path = "./chromedriver"
+
+    driver = webdriver.Chrome(options=options, service=service)
 
     print("Getting url.")
     driver.get(linkedin_url)

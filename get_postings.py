@@ -3,6 +3,7 @@ from pathlib import Path
 import time
 import pandas as pd
 from selenium import webdriver
+from selenium.webdriver import ChromeOptions, ChromeService
 from selenium.webdriver.common.by import By
 import pickle
 from azure_io import download_blob_to_file, upload_file_to_blob
@@ -95,7 +96,13 @@ def get_all_posting_htmls(links_and_metadata, n_retries=10):
         )
         print(f"{expected_time_left=}\n")
 
-    driver = webdriver.Chrome()
+    options = ChromeOptions()
+    service = ChromeService()
+
+    options.binary_location = "./chrome/chrome"
+    service.path = "./chromedriver"
+
+    driver = webdriver.Chrome(options=options, service=service)
     start_idx = get_new_file_number(POSTINGS_CONTENT_PATHS["RAW_FOLDER"])
 
     current_iteration = 0
@@ -132,3 +139,7 @@ def main():
     links_and_metadata = prepare_postings_list()
     get_all_posting_htmls(links_and_metadata)
     merge_save_and_upload_postings()
+
+
+if __name__ == "__main__":
+    main()
