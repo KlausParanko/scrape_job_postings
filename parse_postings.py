@@ -107,6 +107,9 @@ def main():
 
     postings, bullet_lists = _wrangle(postings)
 
+    # parquet dtype error when reading in spark otherwise
+    postings["listing_date"] = postings["listing_date"].apply(str)
+
     postings.to_parquet(PARSED_POSTINGS_PATH["WHOLE_POSTING"], index=False)
     bullet_lists.to_parquet(PARSED_POSTINGS_PATH["BULLET_LISTS"], index=False)
 
